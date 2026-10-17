@@ -204,6 +204,13 @@ export const events = pgTable(
   (t) => [index("events_escrow_idx").on(t.escrowId, t.id)],
 );
 
+/** Cross-instance mutual exclusion, e.g. one settlement pass at a time per signer key. */
+export const leases = pgTable("leases", {
+  name: text("name").primaryKey(),
+  holder: text("holder").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+});
+
 export type Service = typeof services.$inferSelect;
 export type Provider = typeof providers.$inferSelect;
 export type Escrow = typeof escrows.$inferSelect;

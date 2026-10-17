@@ -14,3 +14,6 @@ export const POST = route(async (req: Request) => {
 });
 
 export const GET = POST;
+
+/** A pass may wait on several confirmations. */
+export const maxDuration = 300;

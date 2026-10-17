@@ -63,6 +63,20 @@ async function login(account: PrivateKeyAccount, chainId: number): Promise<strin
   return v.headers.getSetCookie().find((c) => c.startsWith("bs_session="))!.split(";")[0]!;
 }
 
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Run settlement passes until `done` holds, waiting between passes so deferred retries come due. */
+async function settleUntil<T>(read: () => Promise<T>, done: (v: T) => boolean, timeoutMs = 120_000): Promise<T> {
+  const until = Date.now() + timeoutMs;
+  let value = await read();
+  while (!done(value) && Date.now() < until) {
+    await tick();
+    value = await read();
+    if (!done(value)) await sleep(3_000);
+  }
+  return value;
+}
+
 async function tick() {
   const r = await http_("/api/cron/tick", { method: "POST", headers: { authorization: `Bearer ${CRON}` } });
   if (r.status !== 200) throw new Error(`tick failed ${r.status} ${JSON.stringify(r.body)}`);
@@ -91,10 +105,7 @@ async function main() {
   } else {
     check(profile.status === 200, "provider profile exists (re-run)");
   }
-  for (let i = 0; i < 12 && !profile.body.provider.payoutApproved; i++) {
-    await tick();
-    profile = await http_("/api/v1/provider", { cookie: providerCookie });
-  }
+  profile = await settleUntil(() => http_("/api/v1/provider", { cookie: providerCookie }), (p) => p.body.provider.payoutApproved);
   check(profile.body.provider.payoutApproved, "payout address approved on-chain");
   check(await chain.readContract({ address: escrow, abi: escrowAbi, functionName: "isPayee", args: [provider.address] }), "escrow lists the provider as payee");
 
@@ -230,11 +241,7 @@ async function main() {
   step("6. Instant release");
   const fx = await pay("skyline-fx", { query: `pair=${encodeURIComponent("USD/NGN")}` });
   check(fx.paid.status === 200 && fx.paid.body.rate > 0, "fx delivered", fx.paid.body);
-  let fxState = await payment(link(fx.paid));
-  for (let i = 0; i < 10 && fxState.status !== "released"; i++) {
-    await tick();
-    fxState = await payment(link(fx.paid));
-  }
+  const fxState = await settleUntil(() => payment(link(fx.paid)), (p) => p.status === "released");
   check(fxState.status === "released" && fxState.settleTx, "released to provider on-chain", fxState);
 
   step("7. Failed delivery: refunded in full");
@@ -242,11 +249,7 @@ async function main() {
   const broken = await pay("skyline-headlines");
   check(broken.paid.status === 502 && broken.paid.body.error.reason === "schema_mismatch", "502 with the failed check", broken.paid.body);
   check(!JSON.stringify(broken.paid.body).includes("feed temporarily unavailable"), "failing body withheld from the agent");
-  let brokenState = await payment(link(broken.paid));
-  for (let i = 0; i < 10 && brokenState.status !== "refunded"; i++) {
-    await tick();
-    brokenState = await payment(link(broken.paid));
-  }
+  const brokenState = await settleUntil(() => payment(link(broken.paid)), (p) => p.status === "refunded");
   check(brokenState.status === "refunded", "refund settled on-chain", brokenState);
   check((await balance()) === beforeBroken, "payer balance fully restored");
 
@@ -266,18 +269,20 @@ async function main() {
   check(opened.status === 201 && opened.body.payment.status === "disputed", "dispute opened with the payment link", opened.body);
   const answered = await http_(`/api/v1/payments/${dId}/respond`, { method: "POST", cookie: providerCookie, body: JSON.stringify({ statement: "Our figure comes from the airport station at 14:00 local time." }) });
   check(answered.status === 200, "provider responded", answered.body);
-  await tick(); // extends the on-chain deadline for review
+  const disputedEscrow = dId as Hex;
+  const before = (await chain.readContract({ address: escrow, abi: escrowAbi, functionName: "getEscrow", args: [disputedEscrow] })).deadline;
+  const extended = await settleUntil(
+    async () => (await chain.readContract({ address: escrow, abi: escrowAbi, functionName: "getEscrow", args: [disputedEscrow] })).deadline,
+    (d) => d > before,
+  );
+  check(extended > before, "escrow deadline extended on-chain for review");
   const arbiterCookie = await login(arbiter, config.network.chainId);
   const queue = await http_("/api/v1/admin/disputes", { cookie: arbiterCookie });
   check(queue.body.disputes.some((d: { escrowId: string }) => d.escrowId === dId), "dispute in the arbiter queue");
   const beforeSplit = await balance();
   const resolved = await http_(`/api/v1/payments/${dId}/resolve`, { method: "POST", cookie: arbiterCookie, body: JSON.stringify({ decision: "split", payerAmount: "20000", note: "Partly accurate; refunding 0.02." }) });
   check(resolved.status === 200, "arbiter resolved with a split", resolved.body);
-  let dState = await payment(dLink);
-  for (let i = 0; i < 10 && dState.status !== "split"; i++) {
-    await tick();
-    dState = await payment(dLink);
-  }
+  const dState = await settleUntil(() => payment(dLink), (p) => p.status === "split");
   check(dState.status === "split", "split settled on-chain", dState);
   check((await balance()) === beforeSplit + 20_000n, "payer received 0.02 back");
 

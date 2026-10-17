@@ -335,6 +335,12 @@ describe("reconciliation", () => {
     expect(await balanceOf(world, accounts.payer.address)).toBe(before);
   });
 
+  it("lets only one settlement pass run at a time across instances", async () => {
+    const [a, b] = await Promise.all([tick(), tick()]);
+    expect([a.skipped, b.skipped].sort()).toEqual([false, true]);
+    expect((await tick()).skipped).toBe(false); // the lease is released afterwards
+  });
+
   it("waits, rather than refunding, when the RPC has not caught up with a deposit yet", async () => {
     // Load-balanced RPCs can briefly return an empty escrow right after a confirmed deposit.
     const { getDb } = await import("@/server/db/client");
@@ -356,7 +362,10 @@ describe("reconciliation", () => {
       deadline: new Date(Date.now() + 3600_000),
     });
     await enqueue(db, "release", id, { escrowId: id });
+    const { setVisibilityAttemptsForTesting } = await import("@/server/worker");
+    setVisibilityAttemptsForTesting(1);
     await tick();
+    setVisibilityAttemptsForTesting(5);
     expect((await escrowRow(id)).status).toBe("release_pending");
     const [job] = await db.select().from(jobs).where(eq(jobs.escrowId, id));
     expect(job!.status).toBe("pending");

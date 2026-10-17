@@ -5,7 +5,8 @@ import { escrowAbi, HELD_STATUSES, ONCHAIN_STATUS, statusFromChain, type EscrowS
 import { chainNow, ContractRevert, getChainContext, readEscrow, sendEscrowTx, waitForTx, wasReclaimed } from "./chain";
 import { getConfig } from "./config";
 import { getDb, type Db } from "./db/client";
-import { disputes, escrows, jobs, providers, responses, type Escrow, type Job } from "./db/schema";
+import { randomUUID } from "node:crypto";
+import { disputes, escrows, jobs, leases, providers, responses, type Escrow, type Job } from "./db/schema";
 import { enqueue, getEscrow, recordEvent, transition } from "./escrow-store";
 
 const BATCH = 10;
@@ -16,6 +17,8 @@ const FUNDING_STALE_MS = 2 * 60_000;
 const HELD_STALE_MS = 5 * 60_000;
 
 export interface TickReport {
+  /** Another instance held the settlement lease, so this call did nothing. */
+  skipped: boolean;
   jobsRun: number;
   jobsFailed: number;
   reconciled: number;
@@ -66,10 +69,20 @@ async function syncFromChain(db: Db, escrow: Escrow): Promise<EscrowStatus | nul
  * the deposit can hit a node that has not seen it yet: an empty result means "not visible yet", never
  * "missing", and the job retries shortly instead of acting on stale state.
  */
-async function readVisibleEscrow(id: Hex) {
-  const onchain = await readEscrow(id);
-  if (onchain.status === ONCHAIN_STATUS.None) throw new NotYet("escrow not visible on this RPC node yet", new Date(Date.now() + 10_000));
-  return onchain;
+async function readVisibleEscrow(id: Hex, attempts = VISIBILITY_ATTEMPTS) {
+  for (let i = 0; i < attempts; i++) {
+    const onchain = await readEscrow(id);
+    if (onchain.status !== ONCHAIN_STATUS.None) return onchain;
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, 2_000));
+  }
+  throw new NotYet("escrow not visible on this RPC node yet", new Date(Date.now() + 5_000));
+}
+
+/** Lag is usually a few seconds, so absorb it inside one pass (serverless hosts may not tick again soon). */
+let VISIBILITY_ATTEMPTS = 5;
+
+export function setVisibilityAttemptsForTesting(n: number): void {
+  VISIBILITY_ATTEMPTS = n;
 }
 
 async function confirmedOrResend(db: Db, job: Job, send: () => Promise<Hex>): Promise<Hex> {
@@ -325,10 +338,44 @@ async function purgeExpiredResponses(db: Db) {
 
 // --- Entry points -------------------------------------------------------------
 
-/** One full pass. Safe to run concurrently from several processes: jobs are claimed with SKIP LOCKED. */
+const LEASE_NAME = "settlement";
+/** Longer than any healthy pass (job batch + confirmations); a crashed holder is replaced after this. */
+const LEASE_TTL_MS = 4 * 60_000;
+
+/**
+ * Only one settlement pass may run at a time across every instance: all passes send from the same
+ * settler key, and concurrent senders would collide on nonces.
+ */
+async function acquireLease(db: Db): Promise<string | null> {
+  const holder = randomUUID();
+  const now = new Date();
+  await db.insert(leases).values({ name: LEASE_NAME, holder: "", expiresAt: new Date(0) }).onConflictDoNothing({ target: leases.name });
+  const rows = await db
+    .update(leases)
+    .set({ holder, expiresAt: new Date(now.getTime() + LEASE_TTL_MS) })
+    .where(and(eq(leases.name, LEASE_NAME), lt(leases.expiresAt, now)))
+    .returning({ holder: leases.holder });
+  return rows.length ? holder : null;
+}
+
+async function releaseLease(db: Db, holder: string) {
+  await db.update(leases).set({ expiresAt: new Date(0) }).where(and(eq(leases.name, LEASE_NAME), eq(leases.holder, holder)));
+}
+
+/** One full pass. Safe to call from many instances at once: only the lease holder does any work. */
 export async function tick(): Promise<TickReport> {
   const db = await getDb();
-  const report: TickReport = { jobsRun: 0, jobsFailed: 0, reconciled: 0, disputesExpired: 0 };
+  const report: TickReport = { jobsRun: 0, jobsFailed: 0, reconciled: 0, disputesExpired: 0, skipped: false };
+  const holder = await acquireLease(db);
+  if (!holder) return { ...report, skipped: true };
+  try {
+    return await runPass(db, report);
+  } finally {
+    await releaseLease(db, holder).catch((err) => console.error("lease release failed", err));
+  }
+}
+
+async function runPass(db: Db, report: TickReport): Promise<TickReport> {
   const steps: Array<[string, () => Promise<void>]> = [
     ["disputes", () => expireDisputes(db, report)],
     ["funding", () => reconcileFunding(db, report)],

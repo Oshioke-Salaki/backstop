@@ -16,14 +16,16 @@ const MIGRATIONS = path.join(process.cwd(), "drizzle");
  * Postgres when DATABASE_URL is set; otherwise embedded Postgres (PGlite) on disk, or in memory for tests.
  * Both run the same migrations, so behaviour (locking, constraints, SQL) is identical.
  */
-export async function openDb(url = process.env.DATABASE_URL): Promise<DbHandle> {
+export async function openDb(url = process.env.DATABASE_URL, options: { migrate?: boolean } = {}): Promise<DbHandle> {
   if (url && /^postgres(ql)?:\/\//.test(url)) {
     const { default: postgres } = await import("postgres");
     const { drizzle } = await import("drizzle-orm/postgres-js");
     const { migrate } = await import("drizzle-orm/postgres-js/migrator");
-    const sql = postgres(url, { max: Number(process.env.DATABASE_POOL_SIZE ?? 10), prepare: false });
+    const sql = postgres(url, { max: Number(process.env.DATABASE_POOL_SIZE ?? 10), prepare: false, onnotice: () => undefined });
     const db = drizzle(sql, { schema });
-    await migrate(db, { migrationsFolder: MIGRATIONS });
+    // Hosted Postgres is migrated once per deploy (`pnpm migrate`, run by `pnpm build`), never on cold
+    // start: concurrent cold starts would race to apply the same migration.
+    if (options.migrate) await migrate(db, { migrationsFolder: MIGRATIONS });
     return { db: db as unknown as Db, close: () => sql.end() };
   }
 

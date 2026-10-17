@@ -69,6 +69,9 @@ async function serialized<T>(role: Role, fn: () => Promise<T>): Promise<T> {
   return next;
 }
 
+const NONCE_RETRIES = 4;
+const NONCE_ERROR = /nonce|replacement transaction underpriced|already known/i;
+
 export type EscrowWrite =
   | { functionName: "deposit"; args: readonly [unknown, Hex, number] }
   | { functionName: "release"; args: readonly [Hex] }
@@ -107,15 +110,16 @@ export async function sendEscrowTx(role: Role, write: EscrowWrite): Promise<Hex>
     } catch (err) {
       throw toRevert(err);
     }
-    try {
-      return await wallet.writeContract(request as never);
-    } catch (err) {
-      // A stale nonce after a restart is the one send failure worth an immediate retry.
-      if (/nonce/i.test((err as Error).message)) {
+    // Another instance may send from the same key, so a nonce clash is expected now and then:
+    // refetch the nonce and resend, a few times, with jitter so retries do not clash again.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await wallet.writeContract(request as never);
+      } catch (err) {
+        if (attempt >= NONCE_RETRIES || !NONCE_ERROR.test((err as Error).message)) throw err;
         nonceManager.reset({ address: wallet.account.address, chainId: publicClient.chain!.id });
-        return wallet.writeContract(request as never);
+        await new Promise((r) => setTimeout(r, 150 * attempt + Math.random() * 250));
       }
-      throw err;
     }
   });
 }

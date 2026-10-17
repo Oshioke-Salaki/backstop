@@ -29,3 +29,6 @@ export function OPTIONS() {
     },
   });
 }
+
+/** Deposit confirmation (up to 60s) plus the slowest allowed provider (60s), with headroom. */
+export const maxDuration = 150;

@@ -8,6 +8,7 @@
  * pays each one and checks every outcome against on-chain balances: delivered, retried without a
  * second charge, refunded on failed checks, rejected bad input without charge, and disputed then split
  * by the arbiter. Costs about 0.35 USDC of the payer's test funds per run (refunds come back).
+ * Set E2E_PRICE=0.01 on mainnet: newly created services then all cost 0.01 USDC per call.
  */
 import { createPublicClient, erc20Abi, getAddress, http, type Address, type Hex } from "viem";
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
@@ -25,6 +26,8 @@ const CRON = env("CRON_SECRET");
 const provider = privateKeyToAccount(env("PROVIDER_PRIVATE_KEY") as Hex);
 const payer = privateKeyToAccount(env("DEMO_PAYER_PRIVATE_KEY") as Hex);
 const arbiter = privateKeyToAccount(env("ARBITER_PRIVATE_KEY") as Hex);
+/** Uniform price for services this run creates (mainnet runs use real USDC). */
+const PRICE_OVERRIDE = process.env.E2E_PRICE;
 
 let passed = 0;
 function check(cond: unknown, label: string, detail?: unknown): asserts cond {
@@ -167,7 +170,8 @@ async function main() {
   ];
   const existing = (await http_("/api/v1/provider/services", { cookie: providerCookie })).body.services as Array<{ id: string; slug: string; status: string }>;
   for (const spec of specs) {
-    const { dry, ...body } = spec;
+    const { dry, ...rest } = spec;
+    const body = PRICE_OVERRIDE ? { ...rest, price: PRICE_OVERRIDE } : rest;
     let svc = existing.find((s) => s.slug === spec.slug);
     if (!svc) {
       const created = await http_("/api/v1/provider/services", { method: "POST", cookie: providerCookie, body: JSON.stringify(body) });
@@ -229,7 +233,7 @@ async function main() {
   const receipt = decodeBase64Json(forecast.paid.headers.get("x-backstop-receipt")!) as EncodedReceipt;
   const verified = await http_("/api/v1/receipts/verify", { method: "POST", body: JSON.stringify(receipt) });
   check(verified.body.valid === true && verified.body.receipt.passed === true, "signed receipt verifies");
-  check((await balance()) === startBalance - forecast.amount, "0.05 USDC moved from payer into escrow");
+  check((await balance()) === startBalance - forecast.amount, "payment moved from payer into escrow");
   const escrowId = forecast.paid.headers.get("x-backstop-escrow-id") as Hex;
   check((await chain.readContract({ address: escrow, abi: escrowAbi, functionName: "getEscrow", args: [escrowId] })).status === 1, "escrow shows Held on-chain");
   const again = await http_(forecast.path, { method: forecast.method, headers: { "x-payment": forecast.header } });
@@ -280,11 +284,12 @@ async function main() {
   const queue = await http_("/api/v1/admin/disputes", { cookie: arbiterCookie });
   check(queue.body.disputes.some((d: { escrowId: string }) => d.escrowId === dId), "dispute in the arbiter queue");
   const beforeSplit = await balance();
-  const resolved = await http_(`/api/v1/payments/${dId}/resolve`, { method: "POST", cookie: arbiterCookie, body: JSON.stringify({ decision: "split", payerAmount: "20000", note: "Partly accurate; refunding 0.02." }) });
+  const payerShare = disputed.amount / 2n;
+  const resolved = await http_(`/api/v1/payments/${dId}/resolve`, { method: "POST", cookie: arbiterCookie, body: JSON.stringify({ decision: "split", payerAmount: payerShare.toString(), note: "Partly accurate; refunding half." }) });
   check(resolved.status === 200, "arbiter resolved with a split", resolved.body);
   const dState = await settleUntil(() => payment(dLink), (p) => p.status === "split");
   check(dState.status === "split", "split settled on-chain", dState);
-  check((await balance()) === beforeSplit + 20_000n, "payer received 0.02 back");
+  check((await balance()) === beforeSplit + payerShare, "payer received half back");
 
   step("10. Agents over MCP");
   const tools = await http_("/api/mcp", { method: "POST", body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }) });

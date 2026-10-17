@@ -1,108 +1,91 @@
 # Demo guide: Backstop on PayBox
 
-Goal: a 90–120 second video for X that shows an agent paying through PayBox, Backstop holding the money, and a failed provider being refunded automatically, all with real USDC on Base.
+A video of about 2 minutes for X. It shows an agent paying through PayBox, Backstop holding the money in escrow, a broken provider being refunded automatically, and the agent reporting both outcomes. Everything is real USDC on Base mainnet.
 
-**Live (Base mainnet):** https://backstop-base.vercel.app. Escrow [`0x4F09…2E59`](https://basescan.org/address/0x4F094D6FAEA6488BC094C9E041d1cAF327B82E59).
+Every step below was rehearsed end to end on 2026-10-17 in Claude with the PayBox connector.
 
-## Part A: Set up (about 15 minutes, before recording)
+**Live:** https://backstop-base.vercel.app. Escrow [`0x4F09…2E59`](https://basescan.org/address/0x4F094D6FAEA6488BC094C9E041d1cAF327B82E59).
 
-### A1. Point the plugin at mainnet (developer portal)
-1. Open your project at https://developer.paybox.sh.
-2. **Network access → Add host:** `backstop-base.vercel.app`. Keep `backstop-six-nu.vercel.app` too; it does no harm.
-3. **Variables & Secrets:** remove `BACKSTOP_URL`, then **New variable**: Environment variable, name `BACKSTOP_URL`, value `https://backstop-base.vercel.app`.
-4. **Test tools → Load tools**, choose `pay_protected_service`, input:
-   ```json
-   {"slug":"skyline-forecast","query":{"city":"Lagos"}}
-   ```
-   Then **Run test**. You should get an x402 proposal for `10000` (0.01 USDC). Optionally choose a wallet and **Validate transaction**; that previews the payment without paying.
+## Before you record (checklist)
 
-No new upload is needed: the submitted code reads `BACKSTOP_URL`.
+- [ ] **Portal settings:** network host `backstop-base.vercel.app` (bare hostname, no `https://`) and variable `BACKSTOP_URL` = `https://backstop-base.vercel.app`.
+- [ ] **Latest upload (7 tools) submitted:** "Submit Project" clicked after the last upload.
+- [ ] **Claude connected to PayBox** (Customize → Connectors → PayBox, `https://api.paybox.sh/mcp`). Leave tools on *Needs approval*.
+- [ ] **PayBox wallet funded:** USDC on **Base**. 0.50 USDC covers about 50 takes at 0.01 each. The wallet needs no ETH.
+- [ ] **Signing key set up.** The very first payment from a connector asks you to connect a signing key in the PayBox card. Do one payment off camera so later payments are just **Approve**.
+- [ ] **Two tabs ready:** Claude, and https://backstop-base.vercel.app (landing page, for the opening and closing shots).
 
-### A2. Find your PayBox wallet's Base address and fund it
-Any one of these shows the address:
-- **Ask your agent** (Claude with the PayBox connector): *"List my PayBox credentials and show my wallet's Base address."* It calls `list_credentials`.
-- **PayBox app** (https://paybox.sh): open your wallet; copy its EVM/Base address.
-- **CLI:** `npx @paybox-sh/sdk login`, then `npx @paybox-sh/sdk credentials --json`.
+## Rules for the PayBox signing card
 
-Send **0.50 USDC on Base** (network: *Base*, not Ethereum) to that address. Payments are signed EIP-3009 authorizations, so the wallet needs no ETH.
+- Each payment request expires after about **4 minutes**. Sign as soon as the card appears.
+- If no card appears under the reply, send: **`Reopen the signing window.`** It reopens the same payment and never charges twice.
+- If the card says *"Couldn't prepare wallet… operation has expired"*, click **Cancel** (**never Forget**: that deletes your signing key) and ask for a fresh request.
+- Unsigned requests simply expire. Nothing is charged.
 
-### A3. Enable the plugin in your PayBox account
-After **Submit Project**, the plugin appears in your PayBox account under **Unofficial plugins**. Turn it on there. It's private to you until reviewed.
+## The flow (what you type, what happens)
 
-### A4. Connect your agent to PayBox
-In Claude (claude.ai), add the PayBox MCP connector (https://docs.paybox.sh/connect/mcp) and approve a grant for the funded wallet. Leave approvals on *human approval*: approving on camera is part of the demo.
-
-### A5. Prepare the browser tabs
-1. Import the mainnet **provider** key into a browser wallet (MetaMask or Rabby, Base network). The key is `PROVIDER_PRIVATE_KEY` in `backstop/.secrets/base.env`. Open https://backstop-base.vercel.app/signin and sign in. The dashboard lists every payment to the demo services, including the ones PayBox makes, with links to each payment page.
-2. Keep tabs open on:
-   - Claude, with PayBox connected
-   - https://backstop-base.vercel.app (landing page with the live trace)
-   - https://backstop-base.vercel.app/dashboard (signed in)
-   - https://basescan.org/address/0x4F094D6FAEA6488BC094C9E041d1cAF327B82E59
-
-### A6. Dry run once
-Do the whole of Part B once without recording, so approvals and passkey prompts are familiar. Each paid call costs 0.01 USDC, and the broken one is refunded.
-
-## Part B: Record (about 2 minutes)
-
-| Time | On screen | Do |
+| # | You type in Claude | What happens |
 | --- | --- | --- |
-| 0:00 | Backstop landing page | Toggle the trace to **Provider fails** |
-| 0:12 | Claude | Ask the agent to find a protected weather service |
-| 0:25 | Claude + PayBox approval | Ask it to get the Lagos forecast; approve the 0.01 USDC payment |
-| 0:45 | Backstop dashboard → payment page | Open the new payment: *Held for review*, every check ticked |
-| 1:00 | Claude + approval | Ask for market headlines; approve 0.01 USDC |
-| 1:15 | Dashboard → payment page | *Refunded*; click the settlement tx on Basescan |
-| 1:25 | Claude | Prompt 4: the agent confirms "held" and "refunded" itself |
-| 1:35 | Payment page (forecast) | Point at the dispute window: the human can still contest it |
-| 1:45 | Landing page | Close |
+| 1 | `Use my Backstop plugin to find a protected weather service and tell me what it promises.` | Claude finds **City forecast** (0.01 USDC) and reads out its promise (answers within 10 s, required fields) and its delivery record. |
+| 2 | `Get the current forecast for Lagos from it.` | PayBox card shows **$0.01 → backstop-base.vercel.app/x/skyline-forecast?city=Lagos**. Sign it. Card: **Payment sent**. |
+| 3 | *(wait for the reply)* | Claude gives the forecast and says the money is **held in escrow** until the dispute window closes. It may also flag that the temperature looks wrong (the demo provider's numbers are made up), which is a perfect segue. |
+| 4 | *(optional)* `Yes, dispute it. That temperature is wrong.` | Claude files a dispute; the money stays in escrow for review. |
+| 5 | `Now get the market headlines from the Backstop headlines service.` | Claude reads the terms, sees the service is a demo that fails on purpose, and **asks before paying**. |
+| 6 | `Yes, run it. I want to see the refund in action.` | Sign the card. The response fails Backstop's checks, nothing broken reaches the agent, and the 0.01 USDC is **refunded in full**. |
+| 7 | `Show my recent Backstop payments from my PayBox wallet.` | Claude shows a table: headlines **refunded in full** (with the reason) and forecast **delivered, held in escrow** (with its release time). |
 
-Prompts to type in Claude:
-1. `Use my Backstop plugin to find a protected weather service and tell me what it promises.`
-2. `Get the current forecast for Lagos from it.`
-3. `Now get the market headlines from the Backstop headlines service.`
-4. `Show my recent Backstop payments from my PayBox wallet.` The agent calls `my_recent_payments` and reports the forecast as held and the headlines as refunded, with the reason.
+Proof on Basescan (optional final shot): open the escrow contract page above and show the latest transactions.
 
-## Part C: Script (voice-over)
+## Script (voice-over, about 2 minutes)
 
-> **[Landing page, trace on "Provider fails"]**
-> Agents can pay for APIs now. But an x402 payment is a one-way push. When the API fails or returns junk, the money's gone. That's why every agent payment still needs a human to tap approve.
+> **[Landing page; toggle the trace to "Provider fails"]**
+> Agents can pay for APIs now. But an x402 payment is a one-way push: if the API fails or returns junk, the money's gone. That's why every agent payment still needs a human watching.
+> This is Backstop: escrow with automatic refunds for agent payments, built as a PayBox plugin, running on Base with real USDC.
 >
-> This is Backstop: escrow with automatic refunds for agent payments, built as a PayBox plugin.
+> **[Claude: prompt 1]**
+> I ask my agent for a weather service through the Backstop plugin. Every Backstop service publishes a promise the system can check: how fast it answers, what the data must contain. And its delivery record is public.
 >
-> **[Claude, prompt 1]**
-> My agent asks the Backstop plugin for a protected weather service. Every Backstop service publishes a machine-checkable promise: how fast it answers, what shape the data has, which fields must be filled. And its delivery record is public.
+> **[Prompt 2; sign the PayBox card]**
+> It costs one cent. PayBox asks me to approve, same as any payment. The difference is where the money goes: into Backstop's escrow contract, not to the provider.
 >
-> **[Prompt 2, approve in PayBox]**
-> It pays one cent of USDC through PayBox. Same pay_x402 flow as anywhere else. The difference is where the money goes: into the Backstop escrow contract on Base, not to the provider.
+> **[Claude's reply with the forecast]**
+> Backstop called the provider only after the money was locked, checked the response against its promise, and it passed. My agent has the forecast, and the cent is held until the dispute window closes.
+> And look: my agent thinks 34 degrees in Lagos at night is wrong. The checks passed, but I can still dispute it, and the money stays in escrow until it's resolved.
 >
-> **[Payment page: Held for review]**
-> Backstop called the provider only after the money was locked, checked the response against its promise, and every check passed. The agent got its forecast and a signed receipt. The money waits out a short dispute window, then pays the provider.
+> **[Prompt 5; Claude asks first]**
+> Now a provider that breaks its promise. My agent checks the terms first. Let's pay anyway and watch the refund happen.
 >
-> **[Prompt 3, approve]**
-> Now a provider that breaks its promise. This headlines service returns an error dressed up as a 200.
+> **[Prompt 6; sign]**
+> The provider returned junk. Backstop caught it, never passed it to my agent, and refunded the full amount automatically. No ticket, no human.
 >
-> **[Payment page: Refunded, then Basescan]**
-> Backstop caught it, never passed the junk to my agent, and refunded the full amount automatically. No ticket, no human. Here's the refund on Basescan.
->
-> **[Forecast payment page]**
-> And if a response passes the checks but is still wrong, my agent or I can dispute it from this link. The provider answers, an arbiter decides, and the contract enforces it. Even if Backstop went offline, I could reclaim my funds from the contract myself.
+> **[Prompt 7; the table]**
+> My agent can see every outcome: one delivered and held, one refunded in full, with the reason.
 >
 > **[Landing page]**
-> Pay only for what you receive. Backstop: a PayBox plugin, an audited-by-anyone escrow contract on Base, and open source code. Link below.
+> Pay only for what you receive. Backstop: a PayBox plugin, an escrow contract anyone can audit on Base, and open source code.
 
-Post text for X (under 280 characters):
+## Post for X (under 280 characters)
 
-> Agents can pay for APIs. When the API fails, the money's gone.
-> Backstop fixes that: a PayBox plugin that pays into escrow on Base and refunds automatically when a provider breaks its promise.
-> Built for @MoonPay's PayBox hackathon. github.com/Oshioke-Salaki/backstop
+> AI agents can pay for APIs. When the API fails, the money's gone.
+> Backstop fixes that: a @MoonPay PayBox plugin that pays into escrow on Base and refunds automatically when a provider breaks its promise. Real USDC, live.
+> github.com/Oshioke-Salaki/backstop
 
-## If something goes wrong on camera
+Attach the video, and reply to your own post with https://backstop-base.vercel.app.
 
-| Symptom | Cause | Fix |
-| --- | --- | --- |
-| Agent can't find the plugin | Not enabled, or the tool list is stale | Enable it under Unofficial plugins; ask the agent to run `discover_plugins` again |
-| "settles on base-sepolia" message | `BACKSTOP_URL` still points at testnet | Redo A1 |
-| Backstop "did not answer" | Host not allowed | Add `backstop-base.vercel.app` under Network access |
-| Payment declined | Wallet has no USDC on Base | Redo A2 |
-| Payment still "Held" or "Refunding" after a minute | Settlement runs after site traffic | Refresh the payment page; any request triggers a settlement pass |
+## Recording tips
+
+- Record the whole screen at 1080p or higher, and zoom Claude to about 125% so text is readable.
+- Do one full take off camera first; each take costs about 0.01 USDC net (the refund comes back).
+- Speed up the waiting moments in editing, but leave the PayBox card and "Payment sent" visible.
+- If a card doesn't appear on camera, just say "let's reopen the signing window": that's honest and fine.
+
+## If something goes wrong
+
+| Symptom | Fix |
+| --- | --- |
+| No PayBox card under the reply | Send `Reopen the signing window.` |
+| "Couldn't prepare wallet… operation has expired" | Click **Cancel** (not Forget); ask for a fresh request and sign within 4 minutes |
+| Agent says the deployment "settles on base-sepolia" | `BACKSTOP_URL` still points at testnet; fix it in the portal |
+| Backstop "did not answer" | Add `backstop-base.vercel.app` under Network access |
+| Search finds no weather service | Ask it to list every Backstop service, or check the portal settings |
+| Payment declined | The PayBox wallet has no USDC on Base |

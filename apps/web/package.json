@@ -11,7 +11,8 @@
     "test": "vitest run",
     "local": "tsx scripts/local.ts",
     "worker": "tsx scripts/worker.ts",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
     "@backstop/core": "workspace:*",

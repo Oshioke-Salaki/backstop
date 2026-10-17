@@ -6,13 +6,13 @@ How to take Backstop from this repo to a live deployment on Base Sepolia (testne
 
 | Step | What | Who | Time |
 | --- | --- | --- | --- |
-| 1 | Create the wallet keys and app secrets | Done (see below) | — |
-| 2 | Fund **one** address with test ETH | **You** (faucet login + captcha) | 2 min |
-| 3 | Get test USDC for the demo payer | **You** (faucet) | 2 min |
-| 4 | Deploy and wire the escrow contract | Claude, via `bootstrap-testnet.sh` | 2 min |
-| 5 | Create a Postgres database | **You** sign up; Claude configures | 3 min |
-| 6 | Deploy the app to Vercel | Claude, after you approve | 5 min |
-| 7 | Seed a demo provider and services | Claude | 2 min |
+| 1 | Create the wallet keys and app secrets | Done | — |
+| 2 | Fund **one** address with test ETH | Done (you) | — |
+| 3 | Get test USDC for the demo payer | Done (you, 7 USDC) | — |
+| 4 | Deploy and wire the escrow contract | Done | — |
+| 5 | Create a Postgres database | Done (Neon via Vercel) | — |
+| 6 | Deploy the app to Vercel | Done | — |
+| 7 | Seed a demo provider and services | Done, verified by `pnpm e2e:live` (55 checks) | — |
 | 8 | Connect PayBox and record the demo | **You** | 15 min |
 
 ## 1. Keys and secrets (done)
@@ -96,7 +96,7 @@ Vercel functions have no persistent disk, so production needs Postgres. Neon's f
 2. Copy the **pooled** connection string from *Dashboard → Connect* (it contains `-pooler`). It looks like `postgres://user:pass@ep-xxx-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require`.
 3. Give it to Claude, or add it yourself as `DATABASE_URL`.
 
-Migrations run automatically on first connection. Alternatives: [Vercel Postgres via the Neon integration](https://vercel.com/marketplace/neon) or [Supabase](https://supabase.com/docs/guides/database/connecting-to-postgres).
+Migrations run once per deploy as part of `pnpm build` (`scripts/migrate.ts`, using the unpooled URL), never on serverless cold starts. Alternatives: [Vercel Postgres via the Neon integration](https://vercel.com/marketplace/neon) or [Supabase](https://supabase.com/docs/guides/database/connecting-to-postgres).
 
 ## 6. Deploy the app to Vercel
 
@@ -115,6 +115,8 @@ Docs: [Vercel CLI](https://vercel.com/docs/cli), [environment variables](https:/
 
 **How settlement runs on Vercel.** There's no always-on worker, so:
 - Every gateway call, dispute action and API request triggers a settlement pass after its response is sent (`settleSoon()`, using Next's [`after()`](https://nextjs.org/docs/app/api-reference/functions/after)), throttled to once every 20 seconds per instance.
+- A database lease (`leases` table) allows only one pass at a time across all instances, since every pass sends from the same settler key. Concurrent deposits that clash on a nonce retry with a fresh one.
+- A deposit can be briefly invisible to a load-balanced RPC. Settlement waits and retries; it never treats "not visible yet" as missing.
 - `vercel.json` adds a daily cron as a backstop. The free plan allows only daily crons.
 - For timely releases with no traffic, add a free per-minute pinger. For example, [cron-job.org](https://cron-job.org) calling `POST https://<host>/api/cron/tick` with header `Authorization: Bearer <CRON_SECRET>`.
 

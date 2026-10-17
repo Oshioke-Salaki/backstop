@@ -1,5 +1,7 @@
 # Backstop as a PayBox marketplace plugin
 
+**Live on Base Sepolia:** https://backstop-six-nu.vercel.app. Escrow [`0x435A…166a`](https://sepolia.basescan.org/address/0x435AbD2527A0Ff45c0C5A373bf6F02D703a9166a). MCP server at `/api/mcp`. Demo services: `skyline-forecast`, `skyline-fx`, `skyline-headlines` (fails on purpose), and `kite-summarize`.
+
 PayBox Chapter 1 asks for a live marketplace plugin that works end to end, plus a demo video posted to X. Backstop reaches PayBox agents through three surfaces, and all of them are built.
 
 ## 1. x402 services (the fast lane)
@@ -35,9 +37,9 @@ Every paid response carries `x-backstop-payment-url`. The agent hands it to the 
 
 ## Submission checklist
 
-- [ ] Deploy the escrow to Base Sepolia (RUNBOOK.md) and the app to a public https host.
+- [x] Deploy the escrow to Base Sepolia and the app to a public https host.
 - [ ] Register at developer.paybox.sh and finish PayBox account setup (required by the terms).
-- [ ] List one or two real services (or the demo ones from `pnpm local`) with a public upstream.
+- [x] List demo services with public upstreams, verified end to end with real payments (`pnpm e2e:live`, 55 checks).
 - [ ] Connect PayBox to an agent (Claude MCP connector or `@paybox-sh/sdk`) with a wallet funded with Base Sepolia USDC.
 - [ ] Record the demo below and post it to X.
 - [ ] Submit the plugin through the PayBox marketplace process. **Ask MoonPay how third-party plugins are listed: the public docs do not cover it.**

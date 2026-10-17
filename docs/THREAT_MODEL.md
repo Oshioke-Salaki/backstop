@@ -47,7 +47,7 @@
 
 1. **Operator compromise.** A stolen depositor key can deposit pending authorizations to *any registered payee*, because the payer's EIP-3009 signature doesn't bind the payee. Exposure is limited to authorizations in flight (minutes) and capped by `maxEscrowAmount`. Payee registration needs a separate registrar key. *Plan:* keys in KMS/HSM, a per-payee deposit allowlist tied to the service, and per-block velocity limits in the contract.
 2. **Settler compromise** can release disputed or pending escrows early to their bound payee. It cannot redirect funds. *Plan:* move the release delay on-chain (`releaseAfter` in the escrow struct), so early release is impossible.
-3. **Rate limits are per process** (`src/server/ratelimit.ts`). Multi-node deployments need a shared store. `clientIp` trusts `X-Forwarded-For`, so the app must run behind a proxy that sets it.
+3. **Rate limits are per process** (`src/server/ratelimit.ts`). Multi-node deployments need a shared store. `clientIp` trusts `X-Forwarded-For`, so the app must run behind a proxy that sets it (Vercel does). Settlement is already safe across instances (database lease), and deposit nonce clashes between instances are retried. For high deposit throughput, give each instance its own depositor key.
 4. **Verdicts are only as good as the SLA.** Wrong-but-well-formed data passes. That is what disputes are for.
 5. **Stored responses** are encrypted, but readable by whoever holds `DATA_KEY`. Retention defaults to 30 days.
 6. **Base reorgs.** `CONFIRMATIONS` defaults to 1. Raise it for high-value services.

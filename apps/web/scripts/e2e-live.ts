@@ -93,6 +93,16 @@ async function main() {
   const usdc = getAddress(config.asset.address) as Address;
   const escrow = getAddress(config.escrow) as Address;
   const balance = () => chain.readContract({ address: usdc, abi: erc20Abi, functionName: "balanceOf", args: [payer.address] });
+  /** Public RPCs load-balance across nodes that can trail by a block: wait briefly for the expected balance. */
+  const balanceBecomes = async (expected: bigint, timeoutMs = 20_000) => {
+    const until = Date.now() + timeoutMs;
+    let value = await balance();
+    while (value !== expected && Date.now() < until) {
+      await sleep(1_000);
+      value = await balance();
+    }
+    return value === expected;
+  };
 
   step("1. Health and configuration");
   const health = await http_("/api/health");
@@ -233,12 +243,17 @@ async function main() {
   const receipt = decodeBase64Json(forecast.paid.headers.get("x-backstop-receipt")!) as EncodedReceipt;
   const verified = await http_("/api/v1/receipts/verify", { method: "POST", body: JSON.stringify(receipt) });
   check(verified.body.valid === true && verified.body.receipt.passed === true, "signed receipt verifies");
-  check((await balance()) === startBalance - forecast.amount, "payment moved from payer into escrow");
+  check(await balanceBecomes(startBalance - forecast.amount), "payment moved from payer into escrow");
   const escrowId = forecast.paid.headers.get("x-backstop-escrow-id") as Hex;
-  check((await chain.readContract({ address: escrow, abi: escrowAbi, functionName: "getEscrow", args: [escrowId] })).status === 1, "escrow shows Held on-chain");
+  const held = await settleUntil(
+    async () => (await chain.readContract({ address: escrow, abi: escrowAbi, functionName: "getEscrow", args: [escrowId] })).status,
+    (st) => st === 1,
+    20_000,
+  );
+  check(held === 1, "escrow shows Held on-chain");
   const again = await http_(forecast.path, { method: forecast.method, headers: { "x-payment": forecast.header } });
   check(again.status === 200 && JSON.stringify(again.body) === JSON.stringify(forecast.paid.body), "retry replays the same response");
-  check((await balance()) === startBalance - forecast.amount, "retry charged nothing");
+  check(await balanceBecomes(startBalance - forecast.amount), "retry charged nothing");
   const reuse = await http_("/x/skyline-forecast?city=Accra", { headers: { "x-payment": forecast.header } });
   check(reuse.status === 409 && reuse.body.error.code === "payment_reused", "same payment for another request refused");
 
@@ -255,7 +270,7 @@ async function main() {
   check(!JSON.stringify(broken.paid.body).includes("feed temporarily unavailable"), "failing body withheld from the agent");
   const brokenState = await settleUntil(() => payment(link(broken.paid)), (p) => p.status === "refunded");
   check(brokenState.status === "refunded", "refund settled on-chain", brokenState);
-  check((await balance()) === beforeBroken, "payer balance fully restored");
+  check(await balanceBecomes(beforeBroken), "payer balance fully restored");
 
   step("8. POST service");
   const sum = await pay("kite-summarize", { body: JSON.stringify({ text: "Agents pay into escrow and Backstop refunds them automatically when a provider fails to deliver what it promised." }) });
@@ -289,7 +304,7 @@ async function main() {
   check(resolved.status === 200, "arbiter resolved with a split", resolved.body);
   const dState = await settleUntil(() => payment(dLink), (p) => p.status === "split");
   check(dState.status === "split", "split settled on-chain", dState);
-  check((await balance()) === beforeSplit + payerShare, "payer received half back");
+  check(await balanceBecomes(beforeSplit + payerShare), "payer received half back");
 
   step("10. Agents over MCP");
   const tools = await http_("/api/mcp", { method: "POST", body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" }) });

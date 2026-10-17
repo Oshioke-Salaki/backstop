@@ -1,0 +1,259 @@
+@import "tailwindcss";
+
+/*
+ * Backstop design tokens. One ground, one ink, one accent; status colours are functional only.
+ * Every colour has a dark-mode counterpart, chosen for AA contrast against its own ground.
+ */
+:root {
+  --ground: #f3f4f1;
+  --surface: #fbfbf9;
+  --sunken: #e9ebe6;
+  --ink: #0b0d0c;
+  --ink-2: #3d433f;
+  --ink-3: #69706b;
+  --line: #d7dbd4;
+  --line-strong: #b9bfb6;
+  --accent: #0e6b4f;
+  --accent-ink: #ffffff;
+  --accent-soft: #dcefe6;
+  --held: #8a4f00;
+  --held-soft: #f6e9d3;
+  --released: #0e6b4f;
+  --released-soft: #dcefe6;
+  --refunded: #2647a6;
+  --refunded-soft: #e0e7f8;
+  --failed: #b42318;
+  --failed-soft: #f8e1df;
+  --disputed: #7a2e8c;
+  --disputed-soft: #f1e2f4;
+  --focus: #0e6b4f;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #0c0e0d;
+    --surface: #131614;
+    --sunken: #1a1e1b;
+    --ink: #eceeea;
+    --ink-2: #b9bfb8;
+    --ink-3: #8b928b;
+    --line: #262b27;
+    --line-strong: #3a413b;
+    --accent: #4cc79a;
+    --accent-ink: #04130d;
+    --accent-soft: #12291f;
+    --held: #f0b45b;
+    --held-soft: #2b2112;
+    --released: #4cc79a;
+    --released-soft: #12291f;
+    --refunded: #8fa8f5;
+    --refunded-soft: #161d33;
+    --failed: #f4877d;
+    --failed-soft: #321614;
+    --disputed: #d79be6;
+    --disputed-soft: #2a1730;
+    --focus: #4cc79a;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-held: var(--held);
+  --color-held-soft: var(--held-soft);
+  --color-released: var(--released);
+  --color-released-soft: var(--released-soft);
+  --color-refunded: var(--refunded);
+  --color-refunded-soft: var(--refunded-soft);
+  --color-failed: var(--failed);
+  --color-failed-soft: var(--failed-soft);
+  --color-disputed: var(--disputed);
+  --color-disputed-soft: var(--disputed-soft);
+  --font-sans: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Numbers that change should not shift layout. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.animate-rise {
+  animation: rise 360ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.4s ease-in-out infinite;
+}
+
+.skeleton {
+  background: var(--sunken);
+  border-radius: var(--radius-sm);
+  animation: breathe 1.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Long-form docs. Kept to one measure and two weights. */
+.docs h1 {
+  font-size: 32px;
+  line-height: 1.15;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  margin-bottom: 1rem;
+}
+.docs h2 {
+  font-size: 22px;
+  font-weight: 500;
+  margin: 2.5rem 0 0.75rem;
+}
+.docs h3 {
+  font-size: 17px;
+  font-weight: 500;
+  margin: 1.75rem 0 0.5rem;
+}
+.docs p,
+.docs li {
+  color: var(--ink-2);
+  font-size: 16px;
+}
+.docs p {
+  margin: 0.75rem 0;
+}
+.docs ul,
+.docs ol {
+  margin: 0.75rem 0;
+  padding-left: 1.25rem;
+}
+.docs ul {
+  list-style: disc;
+}
+.docs ol {
+  list-style: decimal;
+}
+.docs li {
+  margin: 0.35rem 0;
+}
+.docs a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-color: var(--line-strong);
+}
+.docs code {
+  font-family: var(--font-mono);
+  font-size: 0.88em;
+  background: var(--sunken);
+  padding: 0.1em 0.35em;
+  border-radius: var(--radius-sm);
+}
+.docs pre {
+  background: var(--ink);
+  color: var(--ground);
+  padding: 1rem 1.1rem;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 1rem 0;
+}
+.docs pre code {
+  background: none;
+  padding: 0;
+  color: inherit;
+}
+.docs table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 15px;
+}
+.docs th,
+.docs td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.docs th {
+  color: var(--ink-3);
+  font-weight: 400;
+}

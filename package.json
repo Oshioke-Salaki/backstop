@@ -1,0 +1,10 @@
+{
+  "name": "backstop",
+  "private": true,
+  "packageManager": "pnpm@10.29.3",
+  "scripts": {
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "build": "pnpm -r --if-present build"
+  }
+}

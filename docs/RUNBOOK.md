@@ -2,6 +2,41 @@
 
 How to take Backstop from this repo to a live deployment on Base Sepolia (testnet), and how to run it once it is live. The mainnet differences are at the end.
 
+## Live deployments
+
+**Base mainnet (real USDC, used by the PayBox plugin)**
+
+| | |
+| --- | --- |
+| App | https://backstop-base.vercel.app (Vercel project `backstop-base`, Neon `backstop-base-db`) |
+| Escrow contract | [`0x4F094D6FAEA6488BC094C9E041d1cAF327B82E59`](https://basescan.org/address/0x4F094D6FAEA6488BC094C9E041d1cAF327B82E59) |
+| USDC | [`0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`](https://basescan.org/token/0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913) (EIP-712 name `USD Coin`) |
+| Keys | `.secrets/base.env` (new keys; testnet keys are never reused) |
+
+Deploy cost measured on 2026-10-17: about 0.000012 ETH for the contract and about 0.0000015 ETH per payment. `NET=base ./script/bootstrap.sh` deploys from one funded key.
+
+**Base Sepolia (testnet)**
+
+| | |
+| --- | --- |
+| App | https://backstop-six-nu.vercel.app (Vercel project `backstop`, Neon `backstop-db`) |
+| Escrow contract | [`0x435AbD2527A0Ff45c0C5A373bf6F02D703a9166a`](https://sepolia.basescan.org/address/0x435AbD2527A0Ff45c0C5A373bf6F02D703a9166a) |
+| Keys | `.secrets/base-sepolia.env` |
+
+Both deploy on every push to `main`. Verify either end to end with real payments (55 checks):
+
+```sh
+cd apps/web
+# mainnet: about 0.03 USDC net per run
+set -a; . ../../.secrets/base.env; . ../../.secrets/base.app.env; set +a
+E2E_PRICE=0.01 BASE_URL=https://backstop-base.vercel.app pnpm e2e:live
+# testnet
+set -a; . ../../.secrets/base-sepolia.env; . ../../.secrets/base-sepolia.app.env; set +a
+BASE_URL=https://backstop-six-nu.vercel.app pnpm e2e:live
+```
+
+The demo walkthrough and script are in [DEMO.md](DEMO.md).
+
 ## Who does what
 
 | Step | What | Who | Time |
@@ -73,7 +108,7 @@ Demo payer: `0x1bB1c41A90caa4b7E5F7387AE9Ef2cA080112139`. Base Sepolia USDC is `
 
 ```sh
 cd backstop/contracts
-./script/bootstrap-testnet.sh
+./script/bootstrap.sh
 ```
 
 The script:

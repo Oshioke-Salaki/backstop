@@ -2,7 +2,7 @@
 
 **Agent payments that refund themselves.** Backstop holds x402 payments in escrow until the provider's response passes the checks it promised, then pays the provider, or refunds the agent in full. Built for the PayBox marketplace and compatible with any x402 client.
 
-**Live on Base Sepolia:** https://backstop-six-nu.vercel.app. Escrow [`0x435A…166a`](https://sepolia.basescan.org/address/0x435AbD2527A0Ff45c0C5A373bf6F02D703a9166a).
+**Live on Base mainnet:** https://backstop-base.vercel.app. Escrow [`0x4F09…2E59`](https://basescan.org/address/0x4F094D6FAEA6488BC094C9E041d1cAF327B82E59). Testnet: https://backstop-six-nu.vercel.app. PayBox plugin: [`paybox-plugin/`](paybox-plugin). Demo: [docs/DEMO.md](docs/DEMO.md).
 
 ## Run it locally (one command)
 

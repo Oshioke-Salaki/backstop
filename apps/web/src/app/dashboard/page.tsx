@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ApiKeys, OnboardingForm, PayoutPending, ProfileForm, RotateSecret } from "@/components/provider-forms";
 import { AutoRefresh } from "@/components/payment-actions";
+import { LocalTime } from "@/components/client";
 import { PaymentsTable } from "@/components/payments-table";
 import { ButtonLink, EmptyState, PageHeader, Panel, PanelHeader, Skeleton, SkeletonRows, Stat, cx } from "@/components/ui";
 import { formatPercent } from "@/lib/format";
@@ -88,7 +89,7 @@ async function Dashboard() {
                 <li key={d.escrowId}>
                   <Link href={`/p/${d.escrowId}`} className="flex flex-wrap items-center justify-between gap-2 px-5 py-3 hover:bg-sunken">
                     <span className="text-ink">{d.service}</span>
-                    <span className="text-sm text-disputed">Respond by {d.respondBy.toLocaleString("en", { dateStyle: "medium", timeStyle: "short" })}</span>
+                    <span className="text-sm text-disputed">Respond by <LocalTime value={d.respondBy} /></span>
                   </Link>
                 </li>
               ))}

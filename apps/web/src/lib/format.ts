@@ -1,9 +1,20 @@
-const dateTime = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" });
+const formatters = new Map<string, Intl.DateTimeFormat>();
 
-export function formatDateTime(value: Date | string | null | undefined): string {
+/**
+ * Medium date and short time. Pass `timeZone: "UTC"` for anything rendered on the server: the server's
+ * zone is not the reader's, and output must match between server and first client render.
+ */
+export function formatDateTime(value: Date | string | null | undefined, timeZone?: string): string {
   if (!value) return "—";
   const d = typeof value === "string" ? new Date(value) : value;
-  return Number.isNaN(d.getTime()) ? "—" : dateTime.format(d);
+  if (Number.isNaN(d.getTime())) return "—";
+  const key = timeZone ?? "local";
+  let f = formatters.get(key);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short", ...(timeZone ? { timeZone } : {}) });
+    formatters.set(key, f);
+  }
+  return f.format(d) + (timeZone === "UTC" ? " UTC" : "");
 }
 
 /** "3 hours", "2 days", "45 seconds". */

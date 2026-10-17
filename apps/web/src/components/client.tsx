@@ -85,8 +85,24 @@ export function TimeAgo({ value }: { value: string | Date }) {
     () => null,
   );
   return (
-    <time dateTime={iso} title={formatDateTime(iso)}>
-      {now === null ? formatDateTime(iso) : relative(iso, now)}
+    <time dateTime={iso} title={now === null ? undefined : formatDateTime(iso)}>
+      {now === null ? formatDateTime(iso, "UTC") : relative(iso, now)}
     </time>
   );
+}
+
+const noop = () => () => undefined;
+
+/**
+ * An absolute date and time in the reader's own zone. Server HTML and the hydration pass show UTC
+ * (identical on both sides), then the browser switches to local time.
+ */
+export function LocalTime({ value }: { value: string | Date }) {
+  const iso = typeof value === "string" ? value : value.toISOString();
+  const hydrated = useSyncExternalStore(
+    noop,
+    () => true,
+    () => false,
+  );
+  return <time dateTime={iso}>{formatDateTime(iso, hydrated ? undefined : "UTC")}</time>;
 }

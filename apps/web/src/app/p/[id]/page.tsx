@@ -2,10 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { DISPUTE_REASONS, type DisputeReason } from "@backstop/core/state";
-import { Address, CopyButton, TimeAgo } from "@/components/client";
+import { Address, CopyButton, LocalTime, TimeAgo } from "@/components/client";
 import { AutoRefresh, Countdown, DisputeForm, RefundButton, ResolveForm, RespondForm, WithdrawButton } from "@/components/payment-actions";
 import { buttonClass, cx, Notice, Panel, PanelHeader, Skeleton, StatusMark } from "@/components/ui";
-import { formatDateTime, formatMs } from "@/lib/format";
+import { formatMs } from "@/lib/format";
 import { EVENT_LABELS, FAILURE_LABELS, STATUS } from "@/lib/status";
 import { providerIdFor } from "@/server/auth";
 import { getPayment, viewerFor, type PaymentView, type Viewer } from "@/server/payments";
@@ -141,7 +141,7 @@ function PaymentDetail({ p, viewer, token }: { p: PaymentView; viewer: Viewer; t
                     </span>
                     <div className="min-w-0">
                       <p className="text-[15px] text-ink">{EVENT_LABELS[e.type] ?? e.type}</p>
-                      <p className="text-sm text-ink-3">{formatDateTime(e.createdAt)}</p>
+                      <p className="text-sm text-ink-3"><LocalTime value={e.createdAt} /></p>
                     </div>
                   </li>
                 ))}
@@ -172,7 +172,7 @@ function PaymentDetail({ p, viewer, token }: { p: PaymentView; viewer: Viewer; t
                 </Detail>
               )}
               {p.latencyMs !== null && <Detail label="Response time">{formatMs(p.latencyMs)}</Detail>}
-              {p.deadline && <Detail label="Reclaim opens">{formatDateTime(p.deadline)}</Detail>}
+              {p.deadline && <Detail label="Reclaim opens"><LocalTime value={p.deadline} /></Detail>}
               {p.receipt && (
                 <Detail label="Signed receipt">
                   <span className="inline-flex items-center gap-1">
@@ -211,8 +211,8 @@ function DisputeSection({ p, viewer, token }: { p: PaymentView; viewer: Viewer; 
         description={
           d
             ? d.status === "open"
-              ? `Provider must respond by ${formatDateTime(d.respondBy)}, or the payer is refunded automatically.`
-              : `Resolved ${d.resolution === "release" ? "for the provider" : d.resolution === "refund" ? "for the payer" : "with a split"}${d.resolvedAt ? ` on ${formatDateTime(d.resolvedAt)}` : ""}.`
+              ? <>Provider must respond by <LocalTime value={d.respondBy} />, or the payer is refunded automatically.</>
+              : <>Resolved {d.resolution === "release" ? "for the provider" : d.resolution === "refund" ? "for the payer" : "with a split"}{d.resolvedAt ? <> on <LocalTime value={d.resolvedAt} /></> : null}.</>
             : viewer === "payer" && p.releaseAt
               ? "It passed the automatic checks, but you can still dispute it before the window closes."
               : "You can return this payment before it releases."

@@ -61,6 +61,17 @@ async function syncFromChain(db: Db, escrow: Escrow): Promise<EscrowStatus | nul
   return target;
 }
 
+/**
+ * Read an escrow we know was deposited. RPC providers load-balance across nodes, so a read right after
+ * the deposit can hit a node that has not seen it yet: an empty result means "not visible yet", never
+ * "missing", and the job retries shortly instead of acting on stale state.
+ */
+async function readVisibleEscrow(id: Hex) {
+  const onchain = await readEscrow(id);
+  if (onchain.status === ONCHAIN_STATUS.None) throw new NotYet("escrow not visible on this RPC node yet", new Date(Date.now() + 10_000));
+  return onchain;
+}
+
 async function confirmedOrResend(db: Db, job: Job, send: () => Promise<Hex>): Promise<Hex> {
   if (job.txHash) {
     try {
@@ -96,7 +107,7 @@ async function runRelease(db: Db, job: Job) {
   }
 
   if (await syncFromChain(db, escrow)) return;
-  const onchain = await readEscrow(escrow.id as Hex);
+  const onchain = await readVisibleEscrow(escrow.id as Hex);
   if (onchain.deadline <= (await chainNow())) {
     // Too late to pay the provider: the payer's reclaim right has opened. Refund instead.
     if (!fromDispute) {
@@ -113,6 +124,7 @@ async function runRefund(db: Db, job: Job) {
   const escrow = await getEscrow(db, job.escrowId!);
   if (!escrow || !["refund_pending", "disputed", "release_pending"].includes(escrow.status)) return;
   if (await syncFromChain(db, escrow)) return;
+  await readVisibleEscrow(escrow.id as Hex);
   // Record the intent before sending, so the post-send transition is always valid.
   if (escrow.status === "release_pending") {
     await transition(db, escrow.id, ["release_pending"], "refund_pending", {}, { type: "refund_started" });
@@ -125,6 +137,7 @@ async function runSplit(db: Db, job: Job) {
   const escrow = await getEscrow(db, job.escrowId!);
   if (!escrow || escrow.status !== "disputed") return;
   if (await syncFromChain(db, escrow)) return;
+  await readVisibleEscrow(escrow.id as Hex);
   const payerAmount = BigInt(String(job.payload.payerAmount));
   const tx = await confirmedOrResend(db, job, () => sendEscrowTx("settler", { functionName: "split", args: [escrow.id as Hex, payerAmount] }));
   await transition(db, escrow.id, ["disputed"], "split", { settleTx: tx }, { type: "split", data: { tx, payerAmount } });
@@ -134,7 +147,7 @@ async function runExtend(db: Db, job: Job) {
   const escrow = await getEscrow(db, job.escrowId!);
   if (!escrow || escrow.status !== "disputed") return;
   if (await syncFromChain(db, escrow)) return;
-  const onchain = await readEscrow(escrow.id as Hex);
+  const onchain = await readVisibleEscrow(escrow.id as Hex);
   const wanted = Number(job.payload.deadline);
   const target = Math.min(wanted, onchain.hardDeadline);
   if (target <= onchain.deadline) return; // already long enough, or capped

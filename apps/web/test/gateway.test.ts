@@ -335,6 +335,35 @@ describe("reconciliation", () => {
     expect(await balanceOf(world, accounts.payer.address)).toBe(before);
   });
 
+  it("waits, rather than refunding, when the RPC has not caught up with a deposit yet", async () => {
+    // Load-balanced RPCs can briefly return an empty escrow right after a confirmed deposit.
+    const { getDb } = await import("@/server/db/client");
+    const { escrows, jobs } = await import("@/server/db/schema");
+    const { enqueue } = await import("@/server/escrow-store");
+    const db = await getDb();
+    const id = `0x${"ef".repeat(32)}`;
+    await db.insert(escrows).values({
+      id,
+      serviceId: services.forecast!.id,
+      payer: accounts.payer.address,
+      payee: accounts.provider.address,
+      amountAtomic: PRICE,
+      nonce: `0x${"12".repeat(32)}`,
+      validBefore: BigInt(Math.floor(Date.now() / 1000) + 600),
+      requestHash: `0x${"00".repeat(32)}`,
+      status: "release_pending",
+      releaseAt: new Date(Date.now() - 1000),
+      deadline: new Date(Date.now() + 3600_000),
+    });
+    await enqueue(db, "release", id, { escrowId: id });
+    await tick();
+    expect((await escrowRow(id)).status).toBe("release_pending");
+    const [job] = await db.select().from(jobs).where(eq(jobs.escrowId, id));
+    expect(job!.status).toBe("pending");
+    expect(job!.lastError).toMatch(/not visible/);
+    expect(job!.runAt.getTime()).toBeGreaterThan(Date.now());
+  });
+
   it("marks a never-landed deposit as failed once its authorization expires", async () => {
     const { getDb } = await import("@/server/db/client");
     const { escrows } = await import("@/server/db/schema");

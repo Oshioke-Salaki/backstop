@@ -12,7 +12,8 @@
     "local": "tsx scripts/local.ts",
     "worker": "tsx scripts/worker.ts",
     "db:generate": "drizzle-kit generate",
-    "migrate": "tsx scripts/migrate.ts"
+    "migrate": "tsx scripts/migrate.ts",
+    "e2e:live": "tsx scripts/e2e-live.ts"
   },
   "dependencies": {
     "@backstop/core": "workspace:*",

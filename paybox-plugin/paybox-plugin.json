@@ -1,0 +1,6 @@
+{
+  "tool": "find_protected_services",
+  "arguments": {
+    "query": "forecast"
+  }
+}

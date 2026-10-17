@@ -7,6 +7,7 @@ The PayBox marketplace plugin for Backstop. Built from PayBox plugin starter 1.0
 | `find_protected_services` | read | Search escrow-protected APIs |
 | `get_service` | read | A service's promised checks and 30-day delivery/refund record |
 | `pay_protected_service` | x402 proposal | Pay one call into Backstop escrow (Base mainnet USDC) |
+| `my_recent_payments` | read | A wallet's recent payments and where each one's money is (status only) |
 | `check_payment` | read | Where the money is, from an `x-backstop-payment-url` |
 | `dispute_payment` | write | Contest a delivery that passed checks but was wrong |
 | `verify_receipt` | read | Verify an `x-backstop-receipt` |

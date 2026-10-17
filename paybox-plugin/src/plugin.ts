@@ -287,7 +287,7 @@ function createServer() {
     {
       title: "Pay for a call, protected by escrow",
       description:
-        "Propose an x402 payment for one call to a protected service. Funds go to the Backstop escrow, not the provider: if the response fails any promised check the agent gets a 502 with the reason and a full refund. Keep the x-backstop-payment-url from the paid response to check status or dispute later. Requires the user's approval in PayBox.",
+        "Propose an x402 payment for one call to a protected service. Funds go to the Backstop escrow, not the provider: if the response fails any promised check the agent gets a 502 with the reason and a full refund. Afterwards, call my_recent_payments with the paying wallet's address to confirm whether it was delivered or refunded. Requires the user's approval in PayBox.",
       inputSchema: z
         .object({
           slug: z.string().regex(/^[a-z0-9-]{3,48}$/),
@@ -323,6 +323,77 @@ function createServer() {
           ...(s.method === "POST" ? { body: body ?? {} } : {}),
           maxAmount: s.priceAtomic,
         });
+      } catch (err) {
+        return failure(err);
+      }
+    },
+  );
+
+  server.registerTool(
+    "my_recent_payments",
+    {
+      title: "See recent protected payments from a wallet",
+      description:
+        "List a wallet's most recent Backstop payments, newest first: which service, how much, and where the money is now (held, paid to the provider, refunded, disputed). Use it right after pay_protected_service to tell the user whether the call was delivered or refunded. Pass the public address of the PayBox wallet that paid. Read-only; it grants no access to act on payments.",
+      inputSchema: z
+        .object({
+          wallet: z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe("Public address of the paying wallet (from PayBox list_credentials)."),
+          limit: z.number().int().min(1).max(10).optional().describe("How many payments to return, 1 to 10. Defaults to 5."),
+        })
+        .strict(),
+      outputSchema: z
+        .object({
+          wallet: z.string(),
+          payments: z.array(
+            z
+              .object({
+                escrowId: z.string(),
+                service: z.string(),
+                amountUsdc: z.string(),
+                status: z.string(),
+                summary: z.string(),
+                failure: z.string().nullable(),
+                paidAt: z.string(),
+                releasesAt: z.string().nullable(),
+              })
+              .strict(),
+          ),
+        })
+        .strict(),
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+    },
+    async ({ wallet, limit }) => {
+      try {
+        const data = z
+          .object({
+            payer: z.string(),
+            payments: z.array(
+              z.object({
+                id: z.string(),
+                status: z.string(),
+                service: z.object({ name: z.string() }),
+                amount: z.string(),
+                createdAt: z.string(),
+                releaseAt: z.string().nullable(),
+                failureText: z.string().nullable(),
+              }),
+            ),
+          })
+          .parse(await api(`/api/v1/payments?payer=${wallet}&limit=${limit ?? 5}`));
+        const payments = data.payments.map((p) => ({
+          escrowId: p.id,
+          service: p.service.name,
+          amountUsdc: p.amount,
+          status: p.status,
+          summary: STATUS_TEXT[p.status] ?? p.status,
+          failure: p.failureText,
+          paidAt: p.createdAt,
+          releasesAt: p.status === "release_pending" ? p.releaseAt : null,
+        }));
+        const text = payments.length
+          ? payments.map((p) => `${p.amountUsdc} USDC to ${p.service}: ${p.summary}${p.failure ? ` (${p.failure})` : ""}.`).join("\n")
+          : "No Backstop payments from this wallet yet.";
+        return ok(text, { wallet: data.payer, payments });
       } catch (err) {
         return failure(err);
       }

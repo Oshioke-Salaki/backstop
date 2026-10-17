@@ -27,7 +27,7 @@ Notes:
 
 ## 2. MCP plugin tools
 
-Register `https://<host>/api/mcp` as the plugin endpoint. Tools: `search_services`, `get_service`, `get_payment`, `open_dispute`, `withdraw_dispute`, `verify_receipt`.
+Register `https://<host>/api/mcp` as the plugin endpoint. Tools: `search_services`, `get_service`, `get_payment`, `open_dispute`, `withdraw_dispute`, `verify_receipt`. The PayBox plugin in `paybox-plugin/` exposes `find_protected_services`, `get_service`, `pay_protected_service`, `my_recent_payments`, `check_payment`, `dispute_payment` and `verify_receipt`.
 
 `open_dispute` and `withdraw_dispute` are marked non-read-only, so PayBox hosts that gate side-effecting tools will ask the user first.
 

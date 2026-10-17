@@ -53,18 +53,19 @@ Built as a plugin for [PayBox](https://paybox.sh) (MoonPay's wallet for AI agent
 
 ## Using it from PayBox
 
-The plugin gives an agent six tools:
+The plugin gives an agent seven tools:
 
 | Tool | What it does |
 | --- | --- |
 | `find_protected_services` | Find APIs whose payments are protected |
 | `get_service` | See a service's promise and its delivery record |
 | `pay_protected_service` | Pay for one call. PayBox asks you to approve it |
+| `my_recent_payments` | See what happened to your wallet's recent payments |
 | `check_payment` | See where the money is: held, paid, refunded |
 | `dispute_payment` | Contest a response that was wrong |
 | `verify_receipt` | Check a delivery receipt is genuine |
 
-Example: *"Use my Backstop plugin to get the weather in Lagos."* The agent finds the service, PayBox asks you to approve 0.01 USDC, and the agent gets the forecast. If the provider had failed, you'd get the cent back.
+Example: *"Use my Backstop plugin to get the weather in Lagos."* The agent finds the service, PayBox asks you to approve 0.01 USDC, and the agent gets the forecast. Ask *"what happened to my recent payments?"* and it shows each one as delivered, refunded or held. If the provider had failed, you'd get the cent back.
 
 ## Proof it works
 

@@ -53,6 +53,7 @@ Do the whole of Part B once without recording, so approvals and passkey prompts 
 | 0:45 | Backstop dashboard → payment page | Open the new payment: *Held for review*, every check ticked |
 | 1:00 | Claude + approval | Ask for market headlines; approve 0.01 USDC |
 | 1:15 | Dashboard → payment page | *Refunded*; click the settlement tx on Basescan |
+| 1:25 | Claude | Prompt 4: the agent confirms "held" and "refunded" itself |
 | 1:35 | Payment page (forecast) | Point at the dispute window: the human can still contest it |
 | 1:45 | Landing page | Close |
 
@@ -60,7 +61,7 @@ Prompts to type in Claude:
 1. `Use my Backstop plugin to find a protected weather service and tell me what it promises.`
 2. `Get the current forecast for Lagos from it.`
 3. `Now get the market headlines from the Backstop headlines service.`
-4. *(optional)* `Check the status of that headlines payment.`
+4. `Show my recent Backstop payments from my PayBox wallet.` The agent calls `my_recent_payments` and reports the forecast as held and the headlines as refunded, with the reason.
 
 ## Part C: Script (voice-over)
 

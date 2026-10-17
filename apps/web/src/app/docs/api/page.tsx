@@ -10,6 +10,7 @@ const ROUTES: Array<[string, string, string, string]> = [
   ["GET", "/api/v1/config", "public", "Network, escrow, asset and receipt signer."],
   ["POST", "/api/v1/receipts/verify", "public", "Verify a receipt (header or JSON)."],
   ["POST", "/api/mcp", "public", "MCP server (JSON-RPC over HTTP)."],
+  ["GET", "/api/v1/payments?payer=0x…", "public", "A wallet's recent payments, status only (no links or tokens)."],
   ["GET", "/api/v1/payments/:id", "token or session", "Payment status, timeline and allowed actions."],
   ["POST", "/api/v1/payments/:id/dispute", "payer", "Open a dispute: { reason, statement }."],
   ["POST", "/api/v1/payments/:id/withdraw", "payer", "Withdraw an open dispute."],

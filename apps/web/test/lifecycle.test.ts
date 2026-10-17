@@ -27,6 +27,7 @@ const routes = {
   providerPayments: () => import("@/app/api/v1/provider/payments/route"),
   payerPayments: () => import("@/app/api/v1/payer/payments/route"),
   payment: () => import("@/app/api/v1/payments/[id]/route"),
+  paymentsByPayer: () => import("@/app/api/v1/payments/route"),
   dispute: () => import("@/app/api/v1/payments/[id]/dispute/route"),
   withdraw: () => import("@/app/api/v1/payments/[id]/withdraw/route"),
   respond: () => import("@/app/api/v1/payments/[id]/respond/route"),
@@ -289,6 +290,20 @@ describe("payment views", () => {
     const provider = await call("providerPayments", "GET", "/api/v1/provider/payments?status=release_pending", { cookie: providerCookie });
     expect(provider.body.items.every((i: { status: string }) => i.status === "release_pending")).toBe(true);
     expect((await call("providerPayments", "GET", "/api/v1/provider/payments?cursor=garbage", { cookie: providerCookie })).status).toBe(400);
+  });
+
+  it("lists a wallet's recent payments, status only, without capability tokens", async () => {
+    const { id } = await payHeld("Onitsha");
+    const r = await call("paymentsByPayer", "GET", `/api/v1/payments?payer=${accounts.payer.address.toLowerCase()}&limit=5`);
+    expect(r.status).toBe(200);
+    expect(r.body.payer).toBe(accounts.payer.address);
+    expect(r.body.payments.length).toBeLessThanOrEqual(5);
+    expect(r.body.payments[0]).toMatchObject({ id, status: "release_pending", amount: "0.05", service: { slug: "held-forecast" } });
+    const raw = JSON.stringify(r.body);
+    expect(raw).not.toMatch(/[?&]t=|"token"|paymentUrl/);
+    expect((await call("paymentsByPayer", "GET", "/api/v1/payments?payer=nope")).status).toBe(400);
+    const other = await call("paymentsByPayer", "GET", `/api/v1/payments?payer=${accounts.admin.address}`);
+    expect(other.body.payments).toEqual([]);
   });
 
   it("verifies receipts and rejects tampered ones", async () => {
